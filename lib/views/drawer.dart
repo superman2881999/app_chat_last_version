@@ -79,6 +79,7 @@ class DrawState extends State<Draw>{
           ),
           GestureDetector(
             onTap: () {
+              Navigator.pop(context);
               Navigator.push(context, MaterialPageRoute(builder: (context) => MessageStatistics(null,animate: null,),));
             },
             child: new ListTile(

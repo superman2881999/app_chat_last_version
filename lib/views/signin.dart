@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_chat_last_version/helper/helperFunctions.dart';
 import 'package:flutter_app_chat_last_version/service/authService.dart';
@@ -22,7 +24,7 @@ class SignInState extends State<SignIn> {
   DatabaseService databaseService = new DatabaseService();
   TextEditingController emailUser = new TextEditingController();
   TextEditingController passWordUser = new TextEditingController();
-
+  FirebaseMessaging firebaseMessaging = new FirebaseMessaging();
   QuerySnapshot querySnapshot;
 
   bool isLoading = false;
@@ -39,8 +41,17 @@ class SignInState extends State<SignIn> {
       });
       authService
           .signInWithEmailAndPassword(emailUser.text, passWordUser.text)
-          .then((value) {
-        if (value != null) {
+          .then((authResult) async {
+        if (authResult != null) {
+          String fcmToken = await firebaseMessaging.getToken();
+          FirebaseAuth auth = FirebaseAuth.instance;
+          FirebaseUser user = await auth.currentUser();
+
+          databaseService.uploadToken(user.uid, user.email,fcmToken);
+
+          firebaseMessaging.subscribeToTopic("promotion");
+          firebaseMessaging.subscribeToTopic("news");
+
           HelperFunctions.saveuserLoggedInSharePreference(true);
           Navigator.pushReplacement(
               context,

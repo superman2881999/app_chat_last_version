@@ -31,15 +31,16 @@ dependencies:
   firebase_auth: ^0.16.0
   cloud_firestore: ^0.13.5
   shared_preferences: ^0.5.7
-  fluttertoast: ^7.1.1
-  oktoast: ^2.1.8
   photo_view: ^0.10.2
   image_picker: ^0.6.7+11
   camera: ^0.5.8+7
   path_provider: ^1.6.18
   path: ^1.7.0
   charts_flutter: ^0.9.0
-
+  firebase_storage: ^3.0.3
+  firebase_messaging: 6.0.9
+  firebase_core: ^0.4.0
+  firebase_analytics: any
 
 dev_dependencies:
   flutter_test:
@@ -66,20 +67,19 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-     - images/mimi1.gif
-     - images/mimi2.gif
-     - images/mimi3.gif
-     - images/mimi4.gif
-     - images/mimi5.gif
-     - images/mimi6.gif
-     - images/mimi7.gif
-     - images/mimi8.gif
-     - images/mimi9.gif
      - images/backgroud.jpg
      - images/logo app.png
      - images/iconApp.png
      - images/title.png
      - images/avatar.jpg
+     - sticker_packs/1/
+     - sticker_packs/2/
+     - sticker_packs/3/
+     - sticker_packs/4/
+     - sticker_packs/5/
+     - sticker_packs/6/
+     - sticker_packs/7/
+     - sticker_packs/sticker_packs.json
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

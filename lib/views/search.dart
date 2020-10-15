@@ -4,8 +4,6 @@ import 'package:flutter_app_chat_last_version/helper/constans.dart';
 import 'package:flutter_app_chat_last_version/service/database.dart';
 import 'package:flutter_app_chat_last_version/views/conversation_screen.dart';
 import 'package:flutter_app_chat_last_version/widgets/widget.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:oktoast/oktoast.dart';
 
 class SearchScreen extends StatefulWidget {
   @override

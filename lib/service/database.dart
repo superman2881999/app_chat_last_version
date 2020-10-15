@@ -29,6 +29,22 @@ class DatabaseService {
       print(onError.toString());
     });
   }
+  uploadToken(String uid, String email,String fcmToken) {
+    Firestore.instance
+        .collection("Tokens")
+        .document(uid)
+        .setData({
+        "email": email,
+        "fcmToken": fcmToken
+    });
+  }
+  uploadNotification(String documentID,String message,String email){
+    Firestore.instance.collection("Tokens").document(documentID).collection("notifications").add({
+      "message": message,
+      "title": email,
+      "date": FieldValue.serverTimestamp()
+    });
+  }
 
   addConversation(String chatRoomId, messageMap) {
     Firestore.instance
@@ -45,6 +61,13 @@ class DatabaseService {
         .collection("chats")
         .orderBy('time', descending: true)
         .snapshots();
+  }
+  getLengthOfConversation(String chatRoomId) async {
+    return await Firestore.instance
+        .collection("ChatRoom")
+        .document(chatRoomId)
+        .collection("chats")
+        .getDocuments();
   }
 
   Stream<QuerySnapshot> getMessageLastOfChat ({ @required String chatRoomId}) {

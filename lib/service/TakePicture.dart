@@ -3,11 +3,12 @@ import 'dart:io' as Io;
 import 'dart:convert';
 
 import 'package:camera/camera.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_chat_last_version/helper/constans.dart';
 import 'package:flutter_app_chat_last_version/service/database.dart';
-import 'package:flutter_app_chat_last_version/views/conversation_screen.dart';
 import 'package:path/path.dart' show join;
+import 'package:path/path.dart' as Path;
 import 'package:path_provider/path_provider.dart';
 
 
@@ -53,6 +54,16 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     _controller.dispose();
     super.dispose();
   }
+  Future<String> uploadFiles(Io.File _image) async {
+    StorageReference ref = FirebaseStorage.instance
+        .ref()
+        .child("ImagesChat/${Path.basename(_image.path)}");
+    StorageUploadTask uploadTask = ref.putFile(_image);
+    await uploadTask.onComplete;
+    var dowurl = await (await uploadTask.onComplete).ref.getDownloadURL();
+    String url = dowurl.toString();
+    return url;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,16 +103,23 @@ class TakePictureScreenState extends State<TakePictureScreen> {
               (await getTemporaryDirectory()).path,
               '${DateTime.now()}.png',
             );
-
             // Attempt to take a picture and log where it's been saved.
             await _controller.takePicture(path);
-            Map<String, dynamic> messageMap = {
-              "message": path,
-              "sendBy": Constants.myName,
-              "time": DateTime.now().millisecondsSinceEpoch
-            };
-            // If the picture was taken, display it on a new screen.
-            databaseService.addConversation(widget.chatRoomId, messageMap);
+            Io.File file = Io.File(path);
+            setState(() {
+              uploadFiles(file).then((value){
+                if(value != null){
+                  Map<String, dynamic> messageMap = {
+                    "message": value,
+                    "sendBy": Constants.myName,
+                    "time": DateTime.now().millisecondsSinceEpoch
+                  };
+                  databaseService.addConversation(
+                      widget.chatRoomId, messageMap);
+                }
+                else CircularProgressIndicator();
+              });
+            });
             Navigator.pop(context,true);
           } catch (e) {
             // If an error occurs, log the error to the console.
@@ -109,30 +127,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
           }
         },
       ),
-    );
-  }
-}
-
-// A widget that displays the picture taken by the user.
-class DisplayPictureScreen extends StatelessWidget {
-  final String imagePath;
-
-  const DisplayPictureScreen({Key key, this.imagePath}) : super(key: key);
-
-  Image imageFromBase64String(String base64String) {
-    return Image.memory(base64Decode(base64String));
-  }
-  @override
-  Widget build(BuildContext context) {
-    final bytes = Io.File(imagePath).readAsBytesSync();
-    String img64 = base64Encode(bytes);
-    print(img64);
-
-    return Scaffold(
-      appBar: AppBar(title: Text('Display the Picture')),
-      // The image is stored as a file on the device. Use the `Image.file`
-      // constructor with the given path to display the image.
-      body: imageFromBase64String(img64),
     );
   }
 }

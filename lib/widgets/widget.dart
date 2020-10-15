@@ -40,3 +40,4 @@ Widget container(IconData icon,bool isClicked){
       padding: EdgeInsets.all(5.0),
       child: Center(child: Icon(icon,color: Colors.white)));
 }
+

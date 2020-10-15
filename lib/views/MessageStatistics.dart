@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:flutter_app_chat_last_version/helper/constans.dart';
@@ -13,7 +14,7 @@ class MessageStatistics extends StatefulWidget {
   @override
   State<StatefulWidget> createState() {
     // TODO: implement createState
-    return new _MessageStatisticsState(seriesList,animate: animate);
+    return new _MessageStatisticsState(seriesList, animate: animate);
   }
 }
 
@@ -24,15 +25,6 @@ class _MessageStatisticsState extends State<MessageStatistics> {
 
   DatabaseService databaseService = new DatabaseService();
   Stream chatRoomsStream;
-
-  /// Creates a [BarChart] with sample data and no transition.
-  factory _MessageStatisticsState.withSampleData() {
-    return new _MessageStatisticsState(
-      _createSampleData(),
-      // Disable animations for image tests.
-      animate: true,
-    );
-  }
 
   @override
   void initState() {
@@ -48,15 +40,54 @@ class _MessageStatisticsState extends State<MessageStatistics> {
         chatRoomsStream = value;
       });
     });
+
   }
 
   Widget ChatRoomList() {
+    final List<OneBarChartModal> data = new List<OneBarChartModal>();
+    data.clear();
     return StreamBuilder(
       stream: chatRoomsStream,
       builder: (context, snapshot) {
+        if (snapshot.data == null)
+          return CircularProgressIndicator();
+        for (int i = 0; i < snapshot.data.documents.length; i++) {
+          List<String> username = snapshot
+              .data.documents[i].data["chatroomid"]
+              .toString()
+              .split("_");
+         databaseService.getLengthOfConversation(snapshot.data.documents[i].data["chatroomid"]).then((QuerySnapshot snapshot){
+           snapshot.documents.forEach(
+                 (DocumentSnapshot documentSnapshot) {
+               // prints all the documents available
+               // in the collection
+               debugPrint(documentSnapshot.data.toString());
+             },
+           );
+         });
+              // data.add(new OneBarChartModal(
+              //     messageCount: lengthMessage,
+              //     name: username[0]));
+
+        }
 
         return snapshot.hasData
-            ?
+            ? charts.BarChart(
+                _createSampleData(data),
+                barGroupingType: charts.BarGroupingType.grouped,
+                animationDuration: Duration(seconds: 2),
+                animate: true,
+                vertical: true,
+                barRendererDecorator: new charts.BarLabelDecorator<String>(),
+                domainAxis: new charts.OrdinalAxisSpec(),
+                behaviors: [
+                  // Adding this behavior will allow tapping a bar to center it in the viewport
+                  charts.SlidingViewport(
+                    charts.SelectionModelType.action,
+                  ),
+                  charts.PanBehavior(),
+                ],
+              )
             : Container(child: Center(child: CircularProgressIndicator()));
       },
     );
@@ -69,43 +100,22 @@ class _MessageStatisticsState extends State<MessageStatistics> {
       appBar: appBarMain(context),
       body: Container(
         margin: EdgeInsets.all(20.0),
-        child: new charts.BarChart(
-          _createSampleData(),
-          barGroupingType: charts.BarGroupingType.grouped,
-          animationDuration: Duration(seconds: 3),
-          animate: true,
-          vertical: true,
-          barRendererDecorator: new charts.BarLabelDecorator<String>(),
-          domainAxis: new charts.OrdinalAxisSpec(),
-          behaviors: [
-            // Adding this behavior will allow tapping a bar to center it in the viewport
-            charts.SlidingViewport(
-              charts.SelectionModelType.action,
-            ),
-            charts.PanBehavior(),
-          ],
-        ),
+        child: ChatRoomList(),
       ),
-
     );
   }
 
   /// Create one series with sample hard coded data.
-  static List<charts.Series<OneBarChartModal, String>> _createSampleData() {
-    final data = [
-      new OneBarChartModal(),
-      new OneBarChartModal(),
-      new OneBarChartModal(),
-      new OneBarChartModal(),
-
-    ];
-
+  static List<charts.Series<OneBarChartModal, String>> _createSampleData(
+      List<OneBarChartModal> data) {
     return [
       new charts.Series<OneBarChartModal, String>(
         id: 'Name',
-        labelAccessorFn: (OneBarChartModal barchar, _) => '${barchar.messageCount.toString()}',
+        labelAccessorFn: (OneBarChartModal barchar, _) =>
+            '${barchar.messageCount.toString()}',
         displayName: "Name",
-        colorFn: (OneBarChartModal barchar, __) => charts.MaterialPalette.purple.shadeDefault,
+        colorFn: (OneBarChartModal barchar, __) =>
+            charts.MaterialPalette.purple.shadeDefault,
         domainFn: (OneBarChartModal barchar, _) => barchar.name,
         measureFn: (OneBarChartModal barchar, _) => barchar.messageCount,
         data: data,

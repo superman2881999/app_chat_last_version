@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_chat_last_version/helper/authenticate.dart';
 import 'package:flutter_app_chat_last_version/helper/constans.dart';
@@ -18,6 +19,7 @@ class _ChatRoomState extends State<ChatRoom> {
   AuthService authService = new AuthService();
   DatabaseService databaseService = new DatabaseService();
   Stream chatRoomsStream;
+  FirebaseMessaging _firebaseMessaging = FirebaseMessaging();
 
   Widget ChatRoomList() {
     return StreamBuilder(
@@ -51,7 +53,43 @@ class _ChatRoomState extends State<ChatRoom> {
   void initState() {
     // TODO: implement initState
     getUserInfo();
+    _firebaseMessaging.configure(
+      onMessage: (Map<String, dynamic> message) async {
+        print("onMessage: $message");
+        showMessage("Notification", "$message");
+      },
+      onLaunch: (Map<String, dynamic> message) async {
+        print("onLaunch: $message");
+        showMessage("Notification", "$message");
+      },
+      onResume: (Map<String, dynamic> message) async {
+        print("onResume: $message");
+        showMessage("Notification", "$message");
+      },
+    );
     super.initState();
+  }
+
+  showMessage(title, description) {
+    showDialog(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(title),
+            content: Text(description),
+            actions: <Widget>[
+              FlatButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                },
+                child: Text("Dismiss"),
+              )
+            ],
+          );
+        });
   }
 
   getUserInfo() async {
@@ -151,40 +189,59 @@ class _ChatRoomTileState extends State<ChatRoomTile> {
                 ),
               ),
               Expanded(
-                child: Column(
-                  children: [
-                    Container(
-                      child: StreamBuilder(
-                        stream: getMessageLast,
-                        builder: (context, snapshot) {
-                          if (snapshot.data == null)
-                            return CircularProgressIndicator();
-                          final docs = snapshot.data.documents;
-                          bool isCheckSend =
-                              docs[0]['sendBy'] != Constants.myName;
-                          String isCheck =
-                              "/data/user/0/com.example.flutter_app_chat_last_version/cache/";
-                          return docs.length != 0
-                              ? Text(
-                                  isCheckSend
-                                      ? (docs[0]['message']
-                                              .toString()
-                                              .contains(isCheck)
-                                          ? "You received a image"
-                                          : docs[0]['message'])
-                                      : (docs[0]['message']
-                                              .toString()
-                                              .contains(isCheck)
-                                          ? "You sent a image"
-                                          : "You" + ": " + docs[0]['message']),
-                                  style: mediumTextFieldStyle(),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1)
-                              : Container();
-                        },
-                      ),
-                    )
-                  ],
+                child: Container(
+                  child: StreamBuilder(
+                    stream: getMessageLast,
+                    builder: (context, snapshot) {
+                      if (snapshot.data == null)
+                        return CircularProgressIndicator();
+                      final docs = snapshot.data.documents;
+                      bool isCheckSend =
+                          docs[0]['sendBy'] != Constants.myName;
+                      String isCheck =
+                          "https://firebasestorage.googleapis.com/";
+                      String isSticker = "sticker_packs/";
+                      if(docs.length != 0){
+                        if(isCheckSend) {
+                          if (docs[0]['message'].toString().contains(isCheck)) {
+                            return Text("You received a image",style: mediumTextFieldStyle(),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1);
+                          }
+                          else if (docs[0]['message'].toString().contains(isSticker)){
+                            return Text("You received a sticker",style: mediumTextFieldStyle(),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1);
+                          }
+                          else{
+                            return Text(docs[0]['message'],style: mediumTextFieldStyle(),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1);
+                          }
+                        }
+                        else{
+                          if (docs[0]['message'].toString().contains(isCheck)) {
+                            return Text("You sent a image",style: mediumTextFieldStyle(),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1);
+                          }
+                          else if (docs[0]['message'].toString().contains(isSticker)){
+                            return Text("You sent a sticker",style: mediumTextFieldStyle(),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1);
+                          }
+                          else{
+                            return Text(docs[0]['message'],style: mediumTextFieldStyle(),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1);
+                          }
+                        }
+                      }
+                      else{
+                        return Container();
+                      }
+                    },
+                  ),
                 ),
               ),
               new Row(

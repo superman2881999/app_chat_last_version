@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app_chat_last_version/helper/authenticate.dart';
 import 'package:flutter_app_chat_last_version/helper/helperFunctions.dart';
 import 'package:flutter_app_chat_last_version/views/chatRoomScreen.dart';
-import 'package:camera/camera.dart';
 
 void main() {
   runApp(MyApp());
