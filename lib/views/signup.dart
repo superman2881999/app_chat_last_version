@@ -1,10 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_app_chat_last_version/helper/helperFunctions.dart';
-import 'package:flutter_app_chat_last_version/service/authService.dart';
-import 'package:flutter_app_chat_last_version/service/database.dart';
-import 'package:flutter_app_chat_last_version/widgets/widget.dart';
+import 'dart:io';
 
-import 'chatRoomScreen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_app_chat_last_version/helper/helper_functions.dart';
+import 'package:flutter_app_chat_last_version/service/auth_service.dart';
+import 'package:flutter_app_chat_last_version/service/database.dart';
+import 'package:flutter_app_chat_last_version/views/home.dart';
+import 'package:flutter_app_chat_last_version/widgets/widget.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as Path;
 
 class SignUp extends StatefulWidget {
   final Function toggle;
@@ -12,48 +17,72 @@ class SignUp extends StatefulWidget {
 
   @override
   State<StatefulWidget> createState() {
-    // TODO: implement createState
     return new SignUpState();
   }
 }
 
 class SignUpState extends State<SignUp> {
+  final AuthService _auth = AuthService();
   final _formKey = GlobalKey<FormState>();
-  AuthService authService = new AuthService();
+  bool _isLoading = false;
+
   DatabaseService databaseService = new DatabaseService();
-  bool isLoading = false;
+
 
   TextEditingController userName = new TextEditingController();
   TextEditingController email = new TextEditingController();
   TextEditingController passWord = new TextEditingController();
+  String urlAvt = "images/Avt_Default.jpg";
 
-  signMeUp() {
+  Future<String> uploadFiles(File _image) async {
+    StorageReference ref = FirebaseStorage.instance
+        .ref()
+        .child("avatar/${Path.basename(_image.path)}");
+    StorageUploadTask uploadTask = ref.putFile(_image);
+    await uploadTask.onComplete;
+    var dowUrl = await (await uploadTask.onComplete).ref.getDownloadURL();
+    String url = dowUrl.toString();
+    return url;
+  }
+
+
+  _onRegister() async {
     if (_formKey.currentState.validate()) {
       setState(() {
-        isLoading = true;
-        authService.signUpWithEmailAndPassword(email.text, passWord.text);
-        Map<String, String> userInfoMap = {
-          "name": userName.text,
-          "email": email.text,
-        };
-        HelperFunctions.saveuserEmailSharePreference(email.text);
-        HelperFunctions.saveuserNameSharePreference(userName.text);
-        databaseService.uploadUserInfo(userInfoMap);
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatRoom(),
-            ));
+        _isLoading = true;
+      });
+      FirebaseMessaging firebaseMessaging = new FirebaseMessaging();
+      String token = await firebaseMessaging.getToken();
+      print(token);
+      await _auth.registerWithEmailAndPassword(userName.text, email.text, passWord.text,urlAvt,token).then((result) async {
+        if (result != null) {
+          await HelperFunctions.saveUserLoggedInSharedPreference(true);
+          await HelperFunctions.saveUserEmailSharedPreference(email.text);
+          await HelperFunctions.saveUserNameSharedPreference(userName.text);
+          await HelperFunctions.saveTokenSharedPreference(token);
+
+          print("Registered");
+          await HelperFunctions.getUserLoggedInSharedPreference().then((value) {
+            print("Logged in: $value");
+          });
+          await HelperFunctions.getUserEmailSharedPreference().then((value) {
+            print("Email: $value");
+          });
+          await HelperFunctions.getUserNameSharedPreference().then((value) {
+            print("Full Name: $value");
+          });
+
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => HomeScreen()));
+        }
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
     return Scaffold(
       appBar: appBarMain(context),
-      body: isLoading
+      body: _isLoading
           ? Container(
               child: Center(
                 child: CircularProgressIndicator(),
@@ -68,6 +97,28 @@ class SignUpState extends State<SignUp> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 15),
+                          child: GestureDetector(onTap: () async{
+                            // ignore: deprecated_member_use
+                            final file = await ImagePicker.pickImage(
+                                source: ImageSource.gallery);
+                            if (file == null)
+                              return CircularProgressIndicator();
+                            else {
+                                uploadFiles(file).then((value){
+                                  if (value != null) {
+                                    setState(() {
+                                      urlAvt = value;
+                                    });
+                                  } else
+                                    urlAvt = "images/Avt_Default.jpg";
+                                });
+                            }
+                          },child: CircleAvatar(backgroundImage: urlAvt == "images/Avt_Default.jpg" ? AssetImage(urlAvt) : NetworkImage(urlAvt),maxRadius: MediaQuery.of(context).size.width/4)),
+                        ),
+                      ),
                       Form(
                           key: _formKey,
                           child: Column(
@@ -75,36 +126,39 @@ class SignUpState extends State<SignUp> {
                               TextFormField(
                                   validator: (value) {
                                     return value.isEmpty || value.length < 2
-                                        ? "Please provide username"
+                                        ? "Vui lòng cung cấp tên người dùng"
                                         : null;
                                   },
                                   controller: userName,
                                   style: simpleTextFieldStyle(),
                                   decoration:
-                                      textfieldInputDecoration("UserName")),
+                                      textfieldInputDecoration("Tên người dùng")
+                              ),
                               TextFormField(
                                   validator: (value) {
                                     return RegExp(
                                                 r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+")
                                             .hasMatch(value)
                                         ? null
-                                        : "Please provide a valid email";
+                                        : "Vui lòng cung cấp một email hợp lệ";
                                   },
                                   controller: email,
                                   style: simpleTextFieldStyle(),
                                   decoration:
-                                      textfieldInputDecoration("Email")),
+                                      textfieldInputDecoration("Email")
+                              ),
                               TextFormField(
                                   obscureText: true,
                                   validator: (value) {
                                     return value.length > 6
                                         ? null
-                                        : "Please provide password 6+ characters";
+                                        : "Vui lòng cung cấp mật khẩu 6 ký tự trở lên";
                                   },
                                   controller: passWord,
                                   style: simpleTextFieldStyle(),
                                   decoration:
-                                      textfieldInputDecoration("Password")),
+                                      textfieldInputDecoration("Mật khẩu")
+                              ),
                             ],
                           )),
                       SizedBox(
@@ -113,8 +167,8 @@ class SignUpState extends State<SignUp> {
                       Container(
                         alignment: Alignment.centerRight,
                         child: Container(
-                          child: Text("Forgot Password ?",
-                              style: simpleTextFieldStyle()),
+                          child: Text("Quên mật khẩu ?",
+                              style: greyColorText()),
                           padding: EdgeInsets.symmetric(
                               horizontal: 16.0, vertical: 8.0),
                         ),
@@ -124,35 +178,37 @@ class SignUpState extends State<SignUp> {
                       ),
                       GestureDetector(
                         onTap: () {
-                          signMeUp();
+                          _onRegister();
                         },
                         child: Container(
                           padding: EdgeInsets.symmetric(vertical: 20.0),
                           width: MediaQuery.of(context).size.width,
                           alignment: Alignment.center,
-                          child: Text("Sign Up", style: mediumTextFieldStyle()),
+                          child: Text("Đăng ký", style: mediumTextFieldStyle()),
                           decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(30.0),
-                              gradient: LinearGradient(colors: [
-                                const Color(0xff007EF4),
-                                Color(0xff2A75BC)
-                              ])),
+                              gradient: gradient()),
                         ),
                       ),
                       SizedBox(
                         height: 16,
                       ),
-                      Container(
-                          padding: EdgeInsets.symmetric(vertical: 20.0),
-                          width: MediaQuery.of(context).size.width,
-                          alignment: Alignment.center,
-                          child: Text("Sign Up with Google",
-                              style: TextStyle(
-                                  color: Colors.black87, fontSize: 17.0)),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(30.0),
-                            color: Colors.white,
-                          )),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                                width: 60,
+                                height: 60,
+                                child: Image.asset('images/facebook.png')),
+                          ),
+                          Expanded(
+                            child: Container(
+                                width: 60,
+                                height: 60,
+                                child: Image.asset('images/google.png')),
+                          ),
+                        ],
+                      ),
                       SizedBox(
                         height: 16,
                       ),
@@ -160,8 +216,8 @@ class SignUpState extends State<SignUp> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Already have account?",
-                            style: mediumTextFieldStyle(),
+                            "Đã có tài khoản ? ",
+                            style: minTextFieldStyle(),
                           ),
                           GestureDetector(
                             onTap: () {
@@ -169,17 +225,14 @@ class SignUpState extends State<SignUp> {
                             },
                             child: Container(
                               padding: EdgeInsets.symmetric(vertical: 8.0),
-                              child: Text(" SignIn now",
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 17.0,
-                                      decoration: TextDecoration.underline)),
+                              child: Text("Đăng nhập",
+                                  style: greyColorText()),
                             ),
                           ),
                         ],
                       ),
                       SizedBox(
-                        height: 100,
+                        height: MediaQuery.of(context).size.height/10,
                       ),
                     ],
                   ),

@@ -1,63 +1,71 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app_chat_last_version/helper/helperFunctions.dart';
-import 'package:flutter_app_chat_last_version/service/authService.dart';
+import 'package:flutter_app_chat_last_version/helper/constant.dart';
+import 'package:flutter_app_chat_last_version/helper/helper_functions.dart';
+import 'package:flutter_app_chat_last_version/service/auth_service.dart';
 import 'package:flutter_app_chat_last_version/service/database.dart';
-import 'package:flutter_app_chat_last_version/views/chatRoomScreen.dart';
 import 'package:flutter_app_chat_last_version/widgets/widget.dart';
+import 'package:progress_dialog/progress_dialog.dart';
+
+import 'home.dart';
 
 class SignIn extends StatefulWidget {
   final Function toggle;
   SignIn(this.toggle);
   @override
   State<StatefulWidget> createState() {
-    // TODO: implement createState
     return new SignInState();
   }
 }
 
 class SignInState extends State<SignIn> {
-  final formKey = new GlobalKey<FormState>();
-  AuthService authService = new AuthService();
+  final _formKey = new GlobalKey<FormState>();
+  AuthService _auth = new AuthService();
+
   DatabaseService databaseService = new DatabaseService();
+
   TextEditingController emailUser = new TextEditingController();
   TextEditingController passWordUser = new TextEditingController();
-  FirebaseMessaging firebaseMessaging = new FirebaseMessaging();
+  FirebaseMessaging firebaseMessaging = FirebaseMessaging();
+
   QuerySnapshot querySnapshot;
+  String token;
 
-  bool isLoading = false;
-  signIn() {
-    if (formKey.currentState.validate()) {
-      HelperFunctions.saveuserEmailSharePreference(emailUser.text);
-      setState(() {
-        isLoading = true;
-      });
-      databaseService.getUserByUserEmail(emailUser.text).then((value) {
-        querySnapshot = value;
-        HelperFunctions.saveuserNameSharePreference(
-            querySnapshot.documents[0].data['name']);
-      });
-      authService
-          .signInWithEmailAndPassword(emailUser.text, passWordUser.text)
-          .then((authResult) async {
-        if (authResult != null) {
-          String fcmToken = await firebaseMessaging.getToken();
-          FirebaseAuth auth = FirebaseAuth.instance;
-          FirebaseUser user = await auth.currentUser();
+  ProgressDialog pr;
 
-          databaseService.uploadToken(user.uid, user.email,fcmToken);
+  signIn(ProgressDialog progressDialog) async {
+    if (_formKey.currentState.validate()) {
+      pr.show();
+     token = await firebaseMessaging.getToken();
+      print(token);
+      await _auth.signInWithEmailAndPassword(emailUser.text, passWordUser.text).then((result) async {
+        if (result != null) {
+          QuerySnapshot userInfoSnapshot = await DatabaseService().getUserData(emailUser.text);
 
-          firebaseMessaging.subscribeToTopic("promotion");
-          firebaseMessaging.subscribeToTopic("news");
+          await databaseService.updateToken(userId: userInfoSnapshot.documents[0].data['uid'],token:token);
+          await HelperFunctions.saveUserLoggedInSharedPreference(true);
+          await HelperFunctions.saveUserEmailSharedPreference(emailUser.text);
+          await HelperFunctions.saveUserNameSharedPreference(
+              userInfoSnapshot.documents[0].data['fullName']
+          );
+          await HelperFunctions.saveTokenSharedPreference(token);
 
-          HelperFunctions.saveuserLoggedInSharePreference(true);
-          Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatRoom(),
-              ));
+          print("Signed In");
+          await HelperFunctions.getUserLoggedInSharedPreference().then((value) {
+            print("Logged in: $value");
+          });
+          await HelperFunctions.getUserEmailSharedPreference().then((value) {
+            print("Email: $value");
+          });
+          await HelperFunctions.getUserNameSharedPreference().then((value) {
+            print("Full Name: $value");
+          });
+          await progressDialog.hide();
+         await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => HomeScreen()));
+        }else{
+          pr.hide();
+          Constants.toastAddSuccess(context, "Chưa có tài khoản");
         }
       });
     }
@@ -65,8 +73,8 @@ class SignInState extends State<SignIn> {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Scaffold(
+    pr = new ProgressDialog(context,type: ProgressDialogType.Normal);
+    return  Scaffold(
       appBar: appBarMain(context),
       body: SingleChildScrollView(
         child: Container(
@@ -77,13 +85,12 @@ class SignInState extends State<SignIn> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                    child: Image.asset(
+                Image.asset(
                   "images/logo app.png",
                   fit: BoxFit.cover,
-                )),
+                ),
                 Form(
-                  key: formKey,
+                  key: _formKey,
                   child: Column(
                     children: [
                       TextFormField(
@@ -92,7 +99,7 @@ class SignInState extends State<SignIn> {
                                         r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+")
                                     .hasMatch(value)
                                 ? null
-                                : "Please provide a valid email";
+                                : "Vui lòng cung cấp một email hợp lệ";
                           },
                           controller: emailUser,
                           style: simpleTextFieldStyle(),
@@ -102,11 +109,11 @@ class SignInState extends State<SignIn> {
                           validator: (value) {
                             return value.length > 6
                                 ? null
-                                : "Please provide password 6+ characters";
+                                : "Vui lòng cung cấp mật khẩu từ 6 ký tự trở lên";
                           },
                           controller: passWordUser,
                           style: simpleTextFieldStyle(),
-                          decoration: textfieldInputDecoration("Password")),
+                          decoration: textfieldInputDecoration("Mật khẩu")),
                     ],
                   ),
                 ),
@@ -116,8 +123,8 @@ class SignInState extends State<SignIn> {
                 Container(
                   alignment: Alignment.centerRight,
                   child: Container(
-                    child: Text("Forgot Password ?",
-                        style: simpleTextFieldStyle()),
+                    child: Text("Quên mật khẩu ?",
+                        style: greyColorText()),
                     padding:
                         EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   ),
@@ -127,36 +134,37 @@ class SignInState extends State<SignIn> {
                 ),
                 GestureDetector(
                   onTap: () {
-                    CircularProgressIndicator();
-                    signIn();
+                    signIn(pr);
                   },
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 20.0),
                     width: MediaQuery.of(context).size.width,
                     alignment: Alignment.center,
-                    child: Text("Sign In", style: mediumTextFieldStyle()),
+                    child: Text("Đăng nhập", style: mediumTextFieldStyle()),
                     decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(30.0),
-                        gradient: LinearGradient(colors: [
-                          const Color(0xff007EF4),
-                          Color(0xff2A75BC)
-                        ])),
+                        gradient: gradient()),
                   ),
                 ),
                 SizedBox(
                   height: 16,
                 ),
-                Container(
-                    padding: EdgeInsets.symmetric(vertical: 20.0),
-                    width: MediaQuery.of(context).size.width,
-                    alignment: Alignment.center,
-                    child: Text("Sign In with Google",
-                        style:
-                            TextStyle(color: Colors.black87, fontSize: 17.0)),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30.0),
-                      color: Colors.white,
-                    )),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                          width: 60,
+                          height: 60,
+                          child: Image.asset('images/facebook.png')),
+                    ),
+                    Expanded(
+                      child: Container(
+                          width: 60,
+                          height: 60,
+                          child: Image.asset('images/google.png')),
+                    ),
+                  ],
+                ),
                 SizedBox(
                   height: 16,
                 ),
@@ -164,8 +172,8 @@ class SignInState extends State<SignIn> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Don't have account?",
-                      style: mediumTextFieldStyle(),
+                      "Chưa có mật khẩu ? ",
+                      style: minTextFieldStyle(),
                     ),
                     GestureDetector(
                       onTap: () {
@@ -173,11 +181,8 @@ class SignInState extends State<SignIn> {
                       },
                       child: Container(
                           padding: EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(" Register now",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17.0,
-                                  decoration: TextDecoration.underline))),
+                          child: Text("Đăng ký",
+                              style:greyColorText())),
                     ),
                   ],
                 ),

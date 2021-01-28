@@ -1,13 +1,8 @@
 import 'dart:convert';
-
 import 'dart:io';
 import 'dart:async';
 
 import 'package:camera/camera.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:http/http.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
@@ -16,27 +11,29 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_app_chat_last_version/helper/constant.dart';
 import 'package:flutter_app_chat_last_version/models/sticker_model.dart';
 import 'package:flutter_app_chat_last_version/service/database.dart';
-import 'package:flutter_app_chat_last_version/views/message_location.dart';
-import 'package:flutter_app_chat_last_version/views/take_picture_single.dart';
+import 'package:flutter_app_chat_last_version/views/exception_people.dart';
+import 'package:flutter_app_chat_last_version/views/take_picture_group.dart';
 import 'package:flutter_app_chat_last_version/widgets/widget.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as Path;
-import 'package:geolocator/geolocator.dart';
-
-import 'add_members.dart';
+import 'package:progress_dialog/progress_dialog.dart';
+import 'message_location.dart';
 import 'message_sticker.dart';
 import 'message_tile_image.dart';
+import 'add_members.dart';
 import 'message_tile.dart';
 
-class ConversationScreen extends StatefulWidget {
-  const ConversationScreen({this.nameRoomChat, this.id});
+class ConversationScreenGroup extends StatefulWidget {
+  const ConversationScreenGroup({this.nameRoomChat, this.id});
   final String nameRoomChat;
   final String id;
   @override
-  _ConversationScreenState createState() => _ConversationScreenState();
+  _ConversationScreenGroupState createState() =>
+      _ConversationScreenGroupState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenGroupState extends State<ConversationScreenGroup> {
   DatabaseService databaseService = new DatabaseService();
   TextEditingController message = new TextEditingController();
   Stream chatMessageStream;
@@ -45,53 +42,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
   FirebaseUser user;
   List<String> locationDes;
   FocusNode focusNode = new FocusNode();
- static FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
-  QuerySnapshot querySnapshot;
-  String token;
-
-    FirebaseMessaging firebaseMessaging = FirebaseMessaging();
-
-    Future<bool> sendFcmMessage(String title, String message) async {
-    await databaseService.getUser(widget.nameRoomChat).then((value) async{
-       setState(() {
-         querySnapshot = value;
-         token = querySnapshot.documents[0].data["token"];
-       });
-     });
-     try {
-       var url = 'https://fcm.googleapis.com/fcm/send';
-       var header = {
-         "Content-Type": "application/json",
-         "Authorization":
-         "key=AAAAlkezjgc:APA91bFl6BvMDMz1IJb75TanPjYgm92Y2_MOXxqxZSdKn5QzDMgg6xvG6oYMYj4hdBXghvBSlb4df8-R2otIq5ZH_tCLvZZunoloBmnvRdBFQPVdkRKUjNZ_mKX6-7paVN14Zq37Yr8Z",
-       };
-      var request = {
-         'notification': {'title': title, 'body': message},
-         'data': {
-           'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-           'type': 'Comment'
-         },
-         'to': '$token'
-       };
-
-       var client = new Client();
-       var response =
-       await client.post(url, headers: header, body: json.encode(request));
-       print(response.body);
-       return true;
-     } catch (e) {
-       print(e);
-       return false;
-     }
-   }
+  ProgressDialog progressDialog;
 
   Widget chatMessageList() {
     return StreamBuilder(
       stream: chatMessageStream,
       builder: (context, snapshot) {
-        if (snapshot.data == null) {
-          return Center(child: CircularProgressIndicator());
-        }
         return snapshot.hasData
             ? ListView.builder(
                 reverse: true,
@@ -99,7 +55,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 itemBuilder: (context, index) {
                   String isCheck = "https://firebasestorage.googleapis.com/";
                   String isSticker = "sticker_packs/";
-
                   while (index < snapshot.data.documents.length - 1) {
                     if (snapshot.data.documents[index].data["message"]
                         .toString()
@@ -143,7 +98,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                 Constants.myName,
                         message: snapshot.data.documents[index].data["message"],
                       );
-                    } else if (snapshot.data.documents[index].data["message"]
+                    }
+                    else if (snapshot.data.documents[index].data["message"]
                         .toString()
                         .contains("Send my location to mina*")) {
                       locationDes = snapshot.data.documents[index].data["message"]
@@ -151,20 +107,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       return MessageLocation(
                         locationDes: locationDes,
                         checkSender: snapshot
-                                    .data.documents[index + 1].data["sendBy"] ==
-                                snapshot.data.documents[index].data["sendBy"]
+                            .data.documents[index + 1].data["sendBy"] ==
+                            snapshot.data.documents[index].data["sendBy"]
                             ? false
                             : true,
                         sendBy: snapshot.data.documents[index].data["sendBy"]
-                                .toString()
-                                .substring(0, 1)
-                                .toUpperCase() +
+                            .toString()
+                            .substring(0, 1)
+                            .toUpperCase() +
                             snapshot.data.documents[index].data["sendBy"]
                                 .toString()
                                 .substring(1),
                         sendByMe:
-                            snapshot.data.documents[index].data["sendBy"] ==
-                                Constants.myName,
+                        snapshot.data.documents[index].data["sendBy"] ==
+                            Constants.myName,
                         message: snapshot.data.documents[index].data["message"],
                       );
                     }
@@ -249,7 +205,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             .documents[snapshot.data.documents.length - 1]
                             .data["message"],
                       );
-                    } else if (snapshot.data.documents[index].data["message"]
+                    }else if (snapshot.data.documents[index].data["message"]
                         .toString()
                         .contains("Send my location to mina*")) {
                       locationDes = snapshot.data.documents[index].data["message"]
@@ -257,20 +213,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       return MessageLocation(
                         locationDes: locationDes,
                         checkSender: snapshot
-                                    .data.documents[index + 1].data["sendBy"] ==
-                                snapshot.data.documents[index].data["sendBy"]
+                            .data.documents[index + 1].data["sendBy"] ==
+                            snapshot.data.documents[index].data["sendBy"]
                             ? false
                             : true,
                         sendBy: snapshot.data.documents[index].data["sendBy"]
-                                .toString()
-                                .substring(0, 1)
-                                .toUpperCase() +
+                            .toString()
+                            .substring(0, 1)
+                            .toUpperCase() +
                             snapshot.data.documents[index].data["sendBy"]
                                 .toString()
                                 .substring(1),
                         sendByMe:
-                            snapshot.data.documents[index].data["sendBy"] ==
-                                Constants.myName,
+                        snapshot.data.documents[index].data["sendBy"] ==
+                            Constants.myName,
                         message: snapshot.data.documents[index].data["message"],
                       );
                     }
@@ -361,26 +317,27 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           .documents[snapshot.data.documents.length - 1]
                           .data["message"],
                     );
-                  } else if (snapshot.data.documents[index].data["message"]
+                  }else if (snapshot.data.documents[index].data["message"]
                       .toString()
                       .contains("Send my location to mina*")) {
                     locationDes = snapshot.data.documents[index].data["message"]
                         .toString().split("*");
                     return MessageLocation(
                       locationDes: locationDes,
-                      checkSender:
-                          snapshot.data.documents[index + 1].data["sendBy"] ==
-                                  snapshot.data.documents[index].data["sendBy"]
-                              ? false
-                              : true,
+                      checkSender: snapshot
+                          .data.documents[index + 1].data["sendBy"] ==
+                          snapshot.data.documents[index].data["sendBy"]
+                          ? false
+                          : true,
                       sendBy: snapshot.data.documents[index].data["sendBy"]
-                              .toString()
-                              .substring(0, 1)
-                              .toUpperCase() +
+                          .toString()
+                          .substring(0, 1)
+                          .toUpperCase() +
                           snapshot.data.documents[index].data["sendBy"]
                               .toString()
                               .substring(1),
-                      sendByMe: snapshot.data.documents[index].data["sendBy"] ==
+                      sendByMe:
+                      snapshot.data.documents[index].data["sendBy"] ==
                           Constants.myName,
                       message: snapshot.data.documents[index].data["message"],
                     );
@@ -409,7 +366,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                               .documents[snapshot.data.documents.length - 1]
                               .data["sendBy"] ==
                           Constants.myName);
-                })
+                },
+              )
             : Container(
                 child: Center(child: new CircularProgressIndicator()),
               );
@@ -424,12 +382,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
         "sendBy": Constants.myName,
         "time": DateTime.now().millisecondsSinceEpoch
       };
-      sendFcmMessage(Constants.myName,message.text);
-      databaseService.sendMessage(widget.id, messageMap);
+      databaseService.sendMessageGroup(widget.id, messageMap);
       message.text = "";
     }
   }
-
   //get current location
   Position location;
   Future<void> getUserLocation() async {
@@ -437,47 +393,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
       location = value;
     });
   }
- static Future<dynamic> myBackgroundMessageHandler(Map<String, dynamic> message) {
-    print(message.toString());
-    if (message.containsKey('data')) {
-      Constants.showNotificationWithDefaultSound(
-          flutterLocalNotificationsPlugin,
-          message['notification']['title'],
-          message['notification']['body']);
-    }
-  }
 
   @override
   void initState() {
-    flutterLocalNotificationsPlugin = Constants.initNotify();
-    if (Platform.isIOS) {
-      firebaseMessaging.requestNotificationPermissions(IosNotificationSettings());
-    }
-    firebaseMessaging.configure(
-      onBackgroundMessage: myBackgroundMessageHandler,
-      onMessage: (Map<String, dynamic> message) async {
-        print("onMessage: $message");
-        Constants.showNotificationWithDefaultSound(
-            flutterLocalNotificationsPlugin,
-            message['notification']['title'],
-            message['notification']['body']);
-      },
-      onLaunch: (Map<String, dynamic> message) async {
-        print("onLaunch: $message");
-        Constants.showNotificationWithDefaultSound(
-            flutterLocalNotificationsPlugin,
-            message['notification']['title'],
-            message['notification']['body']);
-      },
-      onResume: (Map<String, dynamic> message) async {
-        print("onResume: $message");
-        Constants.showNotificationWithDefaultSound(
-            flutterLocalNotificationsPlugin,
-            message['notification']['title'],
-            message['notification']['body']);
-      },
-    );
-    databaseService.getConversation(widget.id).then((value) {
+    databaseService.getConversationGroup(widget.id).then((value) {
       setState(() {
         chatMessageStream = value;
       });
@@ -570,7 +489,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   "sendBy": Constants.myName,
                   "time": DateTime.now().millisecondsSinceEpoch
                 };
-                databaseService.sendMessage(widget.id, messageMap);
+                databaseService.sendMessageGroup(widget.id, messageMap);
               },
               child: Image.asset(stickerImg, fit: BoxFit.fill),
             );
@@ -605,14 +524,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Future<String> uploadFiles(File _image) async {
+  Future<String> uploadFiles(File _image, String folderName) async {
+    progressDialog.show();
     StorageReference ref = FirebaseStorage.instance
         .ref()
-        .child("ImagesChat/${Path.basename(_image.path)}");
+        .child("$folderName/${Path.basename(_image.path)}");
     StorageUploadTask uploadTask = ref.putFile(_image);
     await uploadTask.onComplete;
-    var dowurl = await (await uploadTask.onComplete).ref.getDownloadURL();
-    String url = dowurl.toString();
+    var dowUrl = await (await uploadTask.onComplete).ref.getDownloadURL();
+    String url = dowUrl.toString();
     return url;
   }
 
@@ -623,7 +543,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
       user = firebaseUser;
     });
   }
-
   Future<void> _showDialogShareLocation(
       {BuildContext buildContext, String id, Position location}) async {
     return showDialog<void>(
@@ -638,6 +557,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
           actions: [
             FlatButton(
                 onPressed: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ExceptionMembers(
+                          groupId: widget.id,
+                          groupName: widget.nameRoomChat,
+                        ),
+                      ));
+                },
+                child: Text("Ngoại trừ ai ?")),
+            FlatButton(
+                onPressed: () {
                   Navigator.of(context).pop();
                 },
                 child: Text("Không")),
@@ -645,11 +576,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 onPressed: () {
                   Map<String, dynamic> messageMap = {
                     "message":
-                        "Send my location to mina*${location.latitude}*${location.longitude}",
+                    "Send my location to mina*${location.latitude}*${location.longitude}",
                     "sendBy": Constants.myName,
                     "time": DateTime.now().millisecondsSinceEpoch
                   };
-                  databaseService.sendMessage(id, messageMap);
+                  databaseService.sendMessageGroup(id, messageMap);
                   Navigator.of(context).pop();
                 },
                 child: Text("Có"))
@@ -658,28 +589,63 @@ class _ConversationScreenState extends State<ConversationScreen> {
       },
     );
   }
-  @override
-  void dispose() {
-   message.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    setState(() {
-      getUserLocation();
-    });
+    progressDialog =
+        new ProgressDialog(context, type: ProgressDialogType.Normal);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.nameRoomChat),
         actions: [
           IconButton(
+            icon: Icon(Icons.collections),
+            tooltip: "Đổi ảnh đại diện nhóm",
+            onPressed: () async {
+              final file =
+                  // ignore: deprecated_member_use
+                  await ImagePicker.pickImage(source: ImageSource.gallery);
+              if (file == null)
+                return CircularProgressIndicator();
+              else {
+                uploadFiles(file, "avatar").then((value) {
+                  if (value != null) {
+                    setState(() {
+                      DatabaseService().updateIconGroup(
+                          groupId: widget.id, groupIcon: value.toString());
+                    });
+                  } else
+                    value = "images/Avt_Default.jpg";
+                  progressDialog.hide();
+                  Constants.toastAddSuccess(
+                      context, "Thay đổi ảnh đại diện nhóm thành công");
+                });
+              }
+            },
+          ),
+          IconButton(
               icon: Icon(Icons.location_on),
               tooltip: "Gửi địa chỉ của mình",
               onPressed: () {
-                _showDialogShareLocation(
-                    location: location, buildContext: context, id: widget.id);
+                _showDialogShareLocation(location: location,buildContext: context,id: widget.id);
               }),
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: IconButton(
+              icon: Icon(Icons.group_add),
+              tooltip: "Thêm người",
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddMembers(
+                        groupId: widget.id,
+                        groupName: widget.nameRoomChat,
+                      ),
+                    ));
+              },
+            ),
+          )
         ],
       ),
       body: Container(
@@ -689,88 +655,85 @@ class _ConversationScreenState extends State<ConversationScreen> {
             (isShowSticker ? Expanded(child: buildSticker()) : Container()),
             Container(
               alignment: Alignment.bottomCenter,
-              child: Container(
-                decoration: BoxDecoration(gradient: gradient()),
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                child: Row(
-                  children: [
-                    IconButton(
-                        icon: Icon(Icons.photo_camera, color: Colors.white70),
-                        onPressed: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TakePictureScreen(
-                                  single: widget.id,
-                                  camera: firstCamera,
-                                  chatRoomId: widget.nameRoomChat,
-                                ),
-                              ));
-                        }),
-                    IconButton(
-                        icon:
-                            Icon(Icons.insert_emoticon, color: Colors.white70),
-                        onPressed: () {
-                          getSticker();
-                        }),
-                    IconButton(
-                        icon: Icon(Icons.photo, color: Colors.white70),
-                        onPressed: () async {
-                          // ignore: deprecated_member_use
-                          final file = await ImagePicker.pickImage(
-                              source: ImageSource.gallery);
-                          if (file == null)
-                            return CircularProgressIndicator();
-                          else {
-                            setState(() {
-                              uploadFiles(file).then((value) {
-                                if (value != null) {
-                                  Map<String, dynamic> messageMap = {
-                                    "message": value,
-                                    "sendBy": Constants.myName,
-                                    "time":
-                                        DateTime.now().millisecondsSinceEpoch
-                                  };
-                                  sendFcmMessage(Constants.myName,"${Constants.myName} đã gửi một sticker");
-                                  databaseService.sendMessage(
-                                      widget.id, messageMap);
-                                } else
-                                  CircularProgressIndicator();
-                              });
+              decoration: BoxDecoration(gradient: gradient()),
+              padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+              child: Row(
+                children: [
+                  IconButton(
+                      icon: Icon(Icons.photo_camera, color: Colors.white70),
+                      onPressed: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TakePictureGroupScreen(
+                                camera: firstCamera,
+                                chatRoomId: widget.nameRoomChat,
+                                groupId: widget.id,
+                              ),
+                            ));
+                      }),
+                  IconButton(
+                      icon:
+                          Icon(Icons.insert_emoticon, color: Colors.white70),
+                      onPressed: () {
+                        getSticker();
+                      }),
+                  IconButton(
+                      icon: Icon(Icons.photo, color: Colors.white70),
+                      onPressed: () async {
+                        // ignore: deprecated_member_use
+                        final file = await ImagePicker.pickImage(
+                            source: ImageSource.gallery);
+                        if (file == null)
+                          return CircularProgressIndicator();
+                        else {
+                          setState(() {
+                            uploadFiles(file, "ImagesChat").then((value) {
+                              if (value != null) {
+                                Map<String, dynamic> messageMap = {
+                                  "message": value,
+                                  "sendBy": Constants.myName,
+                                  "time":
+                                      DateTime.now().millisecondsSinceEpoch
+                                };
+                                databaseService.sendMessageGroup(
+                                    widget.id, messageMap);
+                              } else
+                                CircularProgressIndicator();
                             });
-                          }
-                        }),
-                    Expanded(
-                      child: TextField(
-                        controller: message,
-                        style: TextStyle(color: Colors.white70),
-                        decoration: InputDecoration.collapsed(
-                            hintText: "Tin nhắn ...",
-                            hintStyle: TextStyle(color: Colors.white70),
-                            border: InputBorder.none),
-                      ),
+                          });
+                        }
+                      }),
+                  Expanded(
+                    child: TextField(
+                      controller: message,
+                      style: TextStyle(color: Colors.white70),
+                      decoration: InputDecoration.collapsed(
+                          hintText: "Tin nhắn ...",
+                          hintStyle: TextStyle(color: Colors.white70),
+                          border: InputBorder.none),
                     ),
-                    GestureDetector(
-                      onTap: () {
-                        if (message.text != "") {
-                          sendMessage();
-                        } else
-                          CircularProgressIndicator();
-                      },
-                      child: Container(
-                          decoration: BoxDecoration(
-                            gradient: gradient2(),
-                            borderRadius: BorderRadius.circular(40.0),
-                          ),
-                          padding: EdgeInsets.all(12.0),
-                          child: Center(
-                              child: Icon(
-                            Icons.send,
-                            color: Colors.white70,
-                          ))),
-                    ),
-                  ],
-                ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      if (message.text != "") {
+                        sendMessage();
+                      } else
+                        CircularProgressIndicator();
+                    },
+                    child: Container(
+                        decoration: BoxDecoration(
+                          gradient: gradient2(),
+                          borderRadius: BorderRadius.circular(40.0),
+                        ),
+                        padding: EdgeInsets.all(12.0),
+                        child: Center(
+                            child: Icon(
+                          Icons.send,
+                          color: Colors.white70,
+                        ))),
+                  ),
+                ],
               ),
             ),
           ],

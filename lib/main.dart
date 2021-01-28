@@ -1,7 +1,11 @@
+import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_app_chat_last_version/helper/authenticate.dart';
-import 'package:flutter_app_chat_last_version/helper/helperFunctions.dart';
-import 'package:flutter_app_chat_last_version/views/chatRoomScreen.dart';
+import 'package:flutter_app_chat_last_version/helper/helper_functions.dart';
+import 'package:flutter_app_chat_last_version/views/home.dart';
+import 'package:flutter_app_chat_last_version/views/profile.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   runApp(MyApp());
@@ -9,6 +13,7 @@ void main() {
 
 class MyApp extends StatefulWidget {
   // This widget is the root of your application.
+  static ThemeModel model = new ThemeModel();
   @override
   _MyAppState createState() => _MyAppState();
 }
@@ -18,31 +23,54 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void initState() {
-    // TODO: implement initState
     getLoggedInState();
     super.initState();
   }
 
   getLoggedInState() async {
-    await HelperFunctions.getuserLoggedInSharePreference().then((value) {
-      setState(() {
-        userIsLoggedIn = value;
-      });
+    await HelperFunctions.getUserLoggedInSharedPreference().then((value) {
+      if (value != null) {
+        setState(() {
+          userIsLoggedIn = value;
+        });
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: Color(0xFFFFEE58),
-        scaffoldBackgroundColor: Color(0xFF64B5F6),
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+    return ChangeNotifierProvider<ThemeModel>(
+      create: (_) => ThemeModel(),
+      child: Consumer<ThemeModel>(
+        builder: (_, model, __) {
+          MyApp.model = model;
+          return MaterialApp(
+              title: 'Chat With My Friends',
+              builder: BotToastInit(),
+              navigatorObservers: [BotToastNavigatorObserver()],
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                primaryColor: Colors.yellow,
+                scaffoldBackgroundColor: const Color(0xFFFFF9C4),
+                primarySwatch: Colors.yellow,
+                visualDensity: VisualDensity.adaptivePlatformDensity,
+              ),
+              darkTheme: ThemeData.dark(), // Provide dark theme.
+              themeMode: MyApp.model.mode,
+              home: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent, // transparent status bar
+                  systemNavigationBarColor:
+                      Colors.black, // navigation bar color
+                  statusBarIconBrightness:
+                      Brightness.dark, // status bar icons' color
+                  systemNavigationBarIconBrightness:
+                      Brightness.dark, //navigation bar icons' color
+                ),
+                child: userIsLoggedIn ? HomeScreen() : Authenticate(),
+              ));
+        },
       ),
-      home: userIsLoggedIn == false ? ChatRoom() : Authenticate(),
     );
   }
 }

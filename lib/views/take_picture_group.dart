@@ -1,33 +1,30 @@
 import 'dart:async';
 import 'dart:io' as Io;
-import 'dart:convert';
 
 import 'package:camera/camera.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app_chat_last_version/helper/constans.dart';
+import 'package:flutter_app_chat_last_version/helper/constant.dart';
 import 'package:flutter_app_chat_last_version/service/database.dart';
 import 'package:path/path.dart' show join;
 import 'package:path/path.dart' as Path;
 import 'package:path_provider/path_provider.dart';
 
-
-// A screen that allows users to take a picture using a given camera.
-class TakePictureScreen extends StatefulWidget {
+class TakePictureGroupScreen extends StatefulWidget {
+  const TakePictureGroupScreen({
+    this.groupId,
+    this.camera,
+    this.chatRoomId,
+  });
   final CameraDescription camera;
   final String chatRoomId;
-
-
-  const TakePictureScreen({
-    Key key,
-    @required this.camera,@required this.chatRoomId,
-  }) : super(key: key);
+  final String groupId;
 
   @override
-  TakePictureScreenState createState() => TakePictureScreenState();
+  TakePictureGroupScreenState createState() => TakePictureGroupScreenState();
 }
 
-class TakePictureScreenState extends State<TakePictureScreen> {
+class TakePictureGroupScreenState extends State<TakePictureGroupScreen> {
   CameraController _controller;
   Future<void> _initializeControllerFuture;
   DatabaseService databaseService = new DatabaseService();
@@ -54,6 +51,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     _controller.dispose();
     super.dispose();
   }
+
   Future<String> uploadFiles(Io.File _image) async {
     StorageReference ref = FirebaseStorage.instance
         .ref()
@@ -67,9 +65,8 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-      appBar: AppBar(title: Text('Take a picture')),
+      appBar: AppBar(title: Text('Chụp ảnh')),
       // Wait until the controller is initialized before displaying the
       // camera preview. Use a FutureBuilder to display a loading spinner
       // until the controller has finished initializing.
@@ -89,8 +86,6 @@ class TakePictureScreenState extends State<TakePictureScreen> {
         child: Icon(Icons.camera_alt),
         // Provide an onPressed callback.
         onPressed: () async {
-          // Take the Picture in a try / catch block. If anything goes wrong,
-          // catch the error.
           try {
             // Ensure that the camera is initialized.
             await _initializeControllerFuture;
@@ -107,20 +102,19 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             await _controller.takePicture(path);
             Io.File file = Io.File(path);
             setState(() {
-              uploadFiles(file).then((value){
-                if(value != null){
+              uploadFiles(file).then((value) {
+                if (value != null) {
                   Map<String, dynamic> messageMap = {
                     "message": value,
                     "sendBy": Constants.myName,
                     "time": DateTime.now().millisecondsSinceEpoch
                   };
-                  databaseService.addConversation(
-                      widget.chatRoomId, messageMap);
-                }
-                else CircularProgressIndicator();
+                  databaseService.sendMessageGroup(widget.groupId, messageMap);
+                } else
+                  CircularProgressIndicator();
               });
             });
-            Navigator.pop(context,true);
+            Navigator.pop(context, true);
           } catch (e) {
             // If an error occurs, log the error to the console.
             print(e);

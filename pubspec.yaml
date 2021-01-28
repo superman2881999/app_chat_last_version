@@ -40,8 +40,24 @@ dependencies:
   firebase_storage: ^3.0.3
   firebase_messaging: 6.0.9
   firebase_core: ^0.4.0
+  device_info: ^0.4.2+9
   firebase_analytics: any
-
+  flutter_local_notifications: ^1.4.3
+  google_nav_bar: ^2.0.0
+  fab_circular_menu: ^1.0.0
+  unicorndial: ^1.1.4
+  progress_dialog: ^1.1.0+1
+  bot_toast: ^3.0.5
+  provider: ^4.3.2+3
+  crypto: ^2.1.5
+  google_maps_flutter: ^0.5.11+1
+  geolocator: ^6.1.5
+  flutter_polyline_points: ^0.2.1
+  url_launcher: ^5.7.0
+  cached_network_image: ^2.4.0
+  lint: ^1.0.0
+  sliding_sheet: ^0.3.7
+  rating_dialog: ^1.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -71,7 +87,10 @@ flutter:
      - images/logo app.png
      - images/iconApp.png
      - images/title.png
-     - images/avatar.jpg
+     - images/facebook.png
+     - images/google.png
+     - images/Avt_Default.jpg
+     - images/changeImageGroup.png
      - sticker_packs/1/
      - sticker_packs/2/
      - sticker_packs/3/
